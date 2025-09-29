@@ -1,128 +1,144 @@
 import tkinter as tk
 from tkinter import messagebox
 import os
-from src.parser import parse_program
-from src.virtual_machine import NormaVM
+from core.executor import run_program
+from core.trace_formatter import format_trace
 
 def start_gui():
     root = tk.Tk()
     root.title("Simulador Máquina Norma")
-    root.geometry("520x550")
-    root.configure(bg="#f0f2f5")
+    root.configure(bg="#e9eef5")
     root.resizable(False, False)
 
-    # -------- Centralizar janela no Windows --------
-    root.update_idletasks()
-    w = 520
-    h = 550
+    # Centraliza a janela
+    w, h = 1280, 720
     x = (root.winfo_screenwidth() // 2) - (w // 2)
     y = (root.winfo_screenheight() // 2) - (h // 2)
     root.geometry(f"{w}x{h}+{x}+{y}")
 
-    # -------- Estilo Geral --------
-    label_style = {"bg": "#f0f2f5", "fg": "#333", "font": ("Segoe UI", 10, "bold")}
-    entry_style = {"bg": "#fff", "fg": "#333", "relief": "solid", "bd": 1}
-    button_style = {"bg": "#4CAF50", "fg": "white", "activebackground": "#45a049",
-                    "activeforeground": "white", "relief": "raised", "font": ("Segoe UI", 10, "bold")}
+    # ---------- ESTILOS ----------
+    title_style = {"bg": "#2c3e50", "fg": "white", "font": ("Segoe UI", 20, "bold")}
+    label_style = {"bg": "#e9eef5", "fg": "#2c3e50", "font": ("Segoe UI", 12, "bold")}
+    entry_style = {"bg": "#ffffff", "fg": "#333", "relief": "solid", "bd": 1, "font": ("Segoe UI", 12)}
+    button_green = {"bg": "#27ae60", "fg": "white", "activebackground": "#1e8449",
+                    "activeforeground": "white", "relief": "flat", "font": ("Segoe UI", 12, "bold"), "width": 15}
+    button_blue = {"bg": "#2980b9", "fg": "white", "activebackground": "#1f618d",
+                   "activeforeground": "white", "relief": "flat", "font": ("Segoe UI", 14, "bold"), "width": 16}
+    button_red_disabled = {"bg": "#e57373", "fg": "white", "relief": "flat",
+                           "font": ("Segoe UI", 12, "bold"), "width": 15, "state": "disabled"}
+    button_red_enabled = {"bg": "#c0392b", "fg": "white", "activebackground": "#922b21",
+                          "activeforeground": "white", "relief": "flat", "font": ("Segoe UI", 12, "bold"), "width": 15}
 
-    frame_main = tk.Frame(root, bg="#f0f2f5", padx=10, pady=10)
+    # ---------- CABEÇALHO ----------
+    header = tk.Frame(root, bg="#2c3e50", height=60)
+    header.pack(fill="x")
+    tk.Label(header, text="Simulador Máquina Norma", **title_style).pack(pady=10)
+
+    # ---------- FRAME PRINCIPAL ----------
+    frame_main = tk.Frame(root, bg="#e9eef5", padx=20, pady=10)
     frame_main.pack(fill="both", expand=True)
 
-    # ------------------------------
-    # 1. Dropdown de Programas
-    # ------------------------------
+    # Linha 1: Programas
     tk.Label(frame_main, text="Programa:", **label_style).grid(row=0, column=0, sticky="w", pady=5)
-
     programas = [f[:-4] for f in os.listdir("programs") if f.endswith(".txt")]
     if not programas:
         programas = ["Nenhum programa encontrado"]
-
     selected_program = tk.StringVar(value=programas[0])
     dropdown = tk.OptionMenu(frame_main, selected_program, *programas)
-    dropdown.config(bg="#fff", fg="#333", relief="solid", width=25)
-    dropdown.grid(row=0, column=1, columnspan=2, sticky="ew", pady=5)
+    dropdown.config(bg="#ffffff", fg="#333", relief="solid", width=35, font=("Segoe UI", 12))
+    dropdown.grid(row=0, column=1, columnspan=3, sticky="ew", pady=5, padx=10)
 
-    # ------------------------------
-    # 2. Quantidade de Registradores + Botão Gerar
-    # ------------------------------
+    # Linha 2: Quantidade + Botões
     tk.Label(frame_main, text="Qtd Registradores:", **label_style).grid(row=1, column=0, sticky="w", pady=5)
     qtd_var = tk.IntVar(value=2)
-    qtd_spin = tk.Spinbox(frame_main, from_=1, to=10, textvariable=qtd_var, width=5, **entry_style)
-    qtd_spin.grid(row=1, column=1, sticky="w", pady=5)
+    qtd_spin = tk.Spinbox(frame_main, from_=1, to=100, textvariable=qtd_var, width=5, **entry_style)
+    qtd_spin.grid(row=1, column=1, sticky="w", pady=5, padx=10)
 
-    frame_regs = tk.Frame(frame_main, bg="#f0f2f5")
+    # Frame para botões lado a lado
+    btn_frame = tk.Frame(frame_main, bg="#e9eef5")
+    btn_frame.grid(row=1, column=2, columnspan=2, sticky="w", padx=10)
+
+    canvas_frame = tk.Frame(frame_main, bg="#e9eef5")
+    canvas_frame.grid(row=3, column=0, columnspan=4, sticky="nsew", pady=5)
+
+    canvas = tk.Canvas(canvas_frame, bg="#e9eef5", highlightthickness=0, height=220)
+    scrollbar = tk.Scrollbar(canvas_frame, orient="vertical", command=canvas.yview)
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    scrollbar.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
+
+    frame_regs = tk.Frame(canvas, bg="#e9eef5")
+    canvas.create_window((0, 0), window=frame_regs, anchor="nw")
+
     reg_entries = []
 
+    # ---------- FUNÇÕES ----------
     def gerar_campos():
         for widget in frame_regs.winfo_children():
             widget.destroy()
         reg_entries.clear()
-
         qtd = qtd_var.get()
         for i in range(qtd):
-            frame = tk.Frame(frame_regs, bg="#f0f2f5", pady=2)
-            frame.pack(anchor="w")
-            nome_var = tk.StringVar(value=chr(97 + i))
+            frame = tk.Frame(frame_regs, bg="#e9eef5", pady=2)
+            frame.pack(anchor="w", pady=3)
+            nome_var = tk.StringVar(value=chr(97 + (i % 26)))
             valor_var = tk.IntVar(value=0)
-
-            tk.Label(frame, text=f"Reg {i+1}:", **label_style).pack(side=tk.LEFT, padx=2)
-            tk.Entry(frame, textvariable=nome_var, width=5, **entry_style).pack(side=tk.LEFT, padx=2)
-            tk.Label(frame, text="=", **label_style).pack(side=tk.LEFT, padx=2)
-            tk.Entry(frame, textvariable=valor_var, width=5, **entry_style).pack(side=tk.LEFT, padx=2)
-
+            tk.Label(frame, text=f"Registrador {i+1}:", **label_style).pack(side=tk.LEFT, padx=5)
+            tk.Entry(frame, textvariable=nome_var, width=6, **entry_style).pack(side=tk.LEFT, padx=5)
+            tk.Label(frame, text="=", **label_style).pack(side=tk.LEFT, padx=5)
+            tk.Entry(frame, textvariable=valor_var, width=10, **entry_style).pack(side=tk.LEFT, padx=5)
             reg_entries.append((nome_var, valor_var))
+        frame_regs.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        btn_excluir.config(**button_red_enabled, state="normal")
 
-        frame_regs.grid(row=3, column=0, columnspan=3, sticky="w", pady=5)
-        btn_executar.grid(row=4, column=0, columnspan=3, pady=10)
+    def excluir_campos():
+        if messagebox.askyesno("Confirmação", "Tem certeza que deseja excluir todos os registradores?"):
+            for widget in frame_regs.winfo_children():
+                widget.destroy()
+            reg_entries.clear()
+            canvas.configure(scrollregion=(0, 0, 0, 0))
+            btn_excluir.config(**button_red_disabled)
 
-    btn_gerar = tk.Button(frame_main, text="Gerar Campos", command=gerar_campos, **button_style)
-    btn_gerar.grid(row=1, column=2, padx=5)
+    btn_gerar = tk.Button(btn_frame, text="Gerar Campos", command=gerar_campos, **button_green)
+    btn_gerar.pack(side=tk.LEFT, padx=5)
 
-    # ------------------------------
-    # 3. Output estilizado
-    # ------------------------------
-    output = tk.Text(frame_main, width=60, height=15, bg="#1e1e1e", fg="#ffffff",
-                     insertbackground="white", font=("Consolas", 10), relief="solid", bd=1)
-    output.grid(row=5, column=0, columnspan=3, pady=10)
+    btn_excluir = tk.Button(btn_frame, text="Excluir Campos", command=excluir_campos, **button_red_disabled)
+    btn_excluir.pack(side=tk.LEFT, padx=5)
 
-    # ------------------------------
-    # 4. Botão Executar
-    # ------------------------------
-    def run_program():
-        fname = selected_program.get()
-        path = f"programs/{fname}.txt"
+    # ---------- BOTÃO EXECUTAR ----------
+    btn_executar = tk.Button(frame_main, text="Executar", **button_blue)
+    btn_executar.grid(row=4, column=0, columnspan=4, pady=10)
 
+    # ---------- OUTPUT ----------
+    output_frame = tk.Frame(frame_main, bg="#000000", bd=1, relief="sunken")
+    output_frame.grid(row=5, column=0, columnspan=4, pady=10, sticky="nsew")
+
+    output_scroll = tk.Scrollbar(output_frame)
+    output_scroll.pack(side="right", fill="y")
+
+    output = tk.Text(output_frame, width=120, height=12, bg="#1e1e1e", fg="#ffffff",
+                     insertbackground="white", font=("Consolas", 12), relief="flat",
+                     yscrollcommand=output_scroll.set)
+    output.pack(side="left", fill="both", expand=True)
+    output_scroll.config(command=output.yview)
+
+    def run():
+        path = f"programs/{selected_program.get()}.txt"
         if not os.path.exists(path):
-            messagebox.showerror("Erro", f"O arquivo '{path}' não foi encontrado!")
+            messagebox.showerror("Erro", f"Arquivo '{path}' não encontrado!")
             return
-
+        registers = {nome_var.get(): valor_var.get() for nome_var, valor_var in reg_entries}
         try:
-            program = parse_program(path)
+            trace, final_registers = run_program(path, registers)
+            output.delete(1.0, tk.END)
+            output.insert(tk.END, format_trace(trace, final_registers))
+        except ZeroDivisionError:
+            messagebox.showerror("Erro de Execução", "Não é possível dividir por zero!")
         except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao carregar programa: {e}")
-            return
+            messagebox.showerror("Erro", f"Ocorreu um erro: {e}")
 
-        registers = {}
-        for nome_var, valor_var in reg_entries:
-            registers[nome_var.get()] = valor_var.get()
-
-        vm = NormaVM(program, registers)
-        vm.run()
-
-        output.delete(1.0, tk.END)
-        output.insert(tk.END, "=== TRACE DE EXECUÇÃO ===\n")
-        for label, regs in vm.trace:
-            estado = ", ".join(f"{k}={v}" for k, v in regs.items())
-            output.insert(tk.END, f"Rótulo {label}: {estado}\n")
-            output.see(tk.END)
-
-        output.insert(tk.END, "\n=== ESTADO FINAL ===\n")
-        estado_final = ", ".join(f"{k}={v}" for k, v in vm.registers.items())
-        output.insert(tk.END, estado_final + "\n")
-        output.insert(tk.END, "=== FIM ===")
-
-    btn_executar = tk.Button(frame_main, text="Executar", command=run_program,
-                             bg="#0078D7", fg="white", activebackground="#005A9E",
-                             activeforeground="white", font=("Segoe UI", 11, "bold"), relief="raised")
+    btn_executar.config(command=run)
 
     root.mainloop()
