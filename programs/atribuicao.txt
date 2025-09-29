@@ -1,0 +1,5 @@
+# Atribui b em a (zera b no final)
+1: se zero_b então vá_para 4 senão vá_para 2
+2: faça add_a vá_para 3
+3: faça sub_b vá_para 1
+4: # fim
