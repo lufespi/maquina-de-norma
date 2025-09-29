@@ -97,8 +97,10 @@ Exemplo de arquivo em `programs/exemplo.txt`:
 
 ## 👨‍💻 Autores
 
-- **Luis Fernando**  
-- (Adicione os demais integrantes do grupo)
+- **Luis Fernando Souza Pinto**  
+- **Kaue Muller**
+- **Bernardo Bencke**
+- **Leonardo Bencke**
 
 ---
 
