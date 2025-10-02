@@ -1,24 +1,20 @@
-
 import re
-from typing import Dict, List, Tuple
+from typing import Dict
 from src.macros import has_macro, expand_macro
 
-RE_COMMENT = re.compile(r"\s*(//.*|#.*)$")
+COMMENT_PATTERN = re.compile(r"\s*(//.*|#.*)$")
+TEST_PATTERN    = re.compile(r"^\s*(\d+)\s*:\s*se\s+zero_([a-z])\s+ent[aã]o\s+v[áa]_para\s+(\d+)\s+sen[aã]o\s+v[áa]_para\s+(\d+)\s*$", re.I)
+OPERATION_PATTERN = re.compile(r"^\s*(\d+)\s*:\s*f(aç|ac)a\s+(add|sub)_([a-z])\s+v[áa]_para\s+(\d+)\s*$", re.I)
+HALT_PATTERN   = re.compile(r"^\s*(\d+)\s*:\s*(fim)\s*$", re.I)
 
-RE_TEST   = re.compile(r"^\s*(\d+)\s*:\s*se\s+zero_([a-z])\s+ent[aã]o\s+v[áa]_para\s+(\d+)\s+sen[aã]o\s+v[áa]_para\s+(\d+)\s*$", re.I)
-RE_OP     = re.compile(r"^\s*(\d+)\s*:\s*f(aç|ac)a\s+(add|sub)_([a-z])\s+v[áa]_para\s+(\d+)\s*$", re.I)
-RE_HALT   = re.compile(r"^\s*(\d+)\s*:\s*(fim)\s*$", re.I)
-
-# Macro with 3 or 4 registers:
-# "<lbl>: faça NOME a b c vá_para NEXT"
-# "<lbl>: faça NOME a b c d vá_para NEXT"
-RE_MACRO  = re.compile(
+# Macro com 3 ou 4 registradores
+MACRO_PATTERN  = re.compile(
     r"^\s*(\d+)\s*:\s*f(?:aç|ac)a\s+([A-Z]+)\s*\(?\s*([a-z](?:\s+[a-z]){2,3})\s*\)?\s+v[áa]_para\s+(\d+)\s*$",
     re.I
 )
 
-def _strip_comment(line: str) -> str:
-    return RE_COMMENT.sub("", line).strip()
+def remove_comment(line: str) -> str:
+    return COMMENT_PATTERN.sub("", line).strip()
 
 def parse_program(path: str) -> Dict[int, dict]:
     with open(path, "r", encoding="utf-8") as f:
@@ -28,11 +24,11 @@ def parse_program(path: str) -> Dict[int, dict]:
     labels_seen = set()
 
     for raw in raw_lines:
-        line = _strip_comment(raw)
+        line = remove_comment(raw)
         if not line:
             continue
 
-        m = RE_MACRO.match(line)
+        m = MACRO_PATTERN.match(line)
         if m:
             lbl, name, regs_str, nxt = m.groups()
             lbl = int(lbl); nxt = int(nxt)
@@ -46,23 +42,25 @@ def parse_program(path: str) -> Dict[int, dict]:
             labels_seen.add(lbl)
             continue
 
-        m = RE_TEST.match(line)
+        m = TEST_PATTERN.match(line)
         if m:
             lbl, reg, t, f_ = m.groups()
             lbl = int(lbl); t = int(t); f_ = int(f_)
-            entries.append((lbl, "test_zero", {"reg": reg.lower(), "t": t, "f": f_, "text": f"se zero_{reg.lower()} então vá_para {t} senão vá_para {f_}"}))
+            entries.append((lbl, "test_zero", {"reg": reg.lower(), "t": t, "f": f_,
+                                               "text": f"se zero_{reg.lower()} então vá_para {t} senão vá_para {f_}"}))
             labels_seen.add(lbl)
             continue
 
-        m = RE_OP.match(line)
+        m = OPERATION_PATTERN.match(line)
         if m:
             lbl, _, op, reg, goto = m.groups()
             lbl = int(lbl); goto = int(goto); op = op.lower()
-            entries.append((lbl, op, {"reg": reg.lower(), "goto": goto, "text": f"faça {op}_{reg.lower()} vá_para {goto}"}))
+            entries.append((lbl, op, {"reg": reg.lower(), "goto": goto,
+                                      "text": f"faça {op}_{reg.lower()} vá_para {goto}"}))
             labels_seen.add(lbl)
             continue
 
-        m = RE_HALT.match(line)
+        m = HALT_PATTERN.match(line)
         if m:
             lbl, _ = m.groups()
             lbl = int(lbl)
@@ -78,13 +76,17 @@ def parse_program(path: str) -> Dict[int, dict]:
     for (lbl, kind, data) in entries:
         if kind != "macro":
             if kind == "test_zero":
-                program[lbl] = {"type": "test_zero", "reg": data["reg"], "goto_true": data["t"], "goto_false": data["f"], "text": data["text"]}
+                program[lbl] = {"type": "test_zero", "reg": data["reg"],
+                                "goto_true": data["t"], "goto_false": data["f"],
+                                "text": data["text"]}
             elif kind in ("add", "sub"):
-                program[lbl] = {"type": kind, "reg": data["reg"], "goto": data["goto"], "text": data["text"]}
+                program[lbl] = {"type": kind, "reg": data["reg"],
+                                "goto": data["goto"], "text": data["text"]}
             elif kind == "halt":
                 program[lbl] = {"type": "halt", "text": "fim"}
             continue
 
+        # Macro encontrada
         name  = data["name"]
         regs  = data["args"]
         goto_after = data["next"]
@@ -109,9 +111,7 @@ def parse_program(path: str) -> Dict[int, dict]:
                 out["reg"] = instr["reg"]
                 out["goto"] = goto_after if instr["goto"] == len(rel_code) else rel_to_abs[instr["goto"]]
                 out["text"] = instr.get("text") or f"faça {itype}_{out['reg']} vá_para {out['goto']}"
-            elif itype == "goto":
-                out = {"type": "goto", "goto": goto_after, "text": f"vá_para {goto_after}"}
-            elif itype == "halt":
+            elif itype in ("goto", "halt"):
                 out = {"type": "goto", "goto": goto_after, "text": f"vá_para {goto_after}"}
             else:
                 raise ValueError(f"Tipo de instrução desconhecido em macro: {itype}")
