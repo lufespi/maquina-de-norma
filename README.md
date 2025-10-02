@@ -4,22 +4,24 @@ Este projeto é um **Simulador de Máquina Norma** desenvolvido em Python, com i
 
 ---
 
-## 📌 Funcionalidades
+## ✨ Principais funcionalidades
 
-✅ Leitura de programas monolíticos a partir de arquivos `.txt`.  
-✅ Inicialização de registradores definidos pelo usuário.  
-✅ Execução passo a passo com **trace detalhado** mostrando valores antes e depois de cada instrução.  
-✅ Implementação das operações básicas: `zero_x`, `add_x`, `sub_x`.  
-✅ **Macros implementadas:**  
-- `MULT`: Multiplicação de dois registradores  
-- `DIV`: Divisão com quociente e resto  
-- `ENCODE` / `DECODE`: Codificação e decodificação via Par de Cantor  
+- Leitura de **programas monolíticos rotulados** (`1: ...`, `2: ...`, etc.).  
+- **Registradores** nomeados `a..z` com valores inteiros **não-negativos** (saturação em 0).  
+- **Operações primitivas**:  
+  - `se zero_x então vá_para N senão vá_para M`  
+  - `faça add_x vá_para N`  
+  - `faça sub_x vá_para N` (sem valores negativos)  
+  - `fim` (parada)
+- **Macros** de alto nível (expandidas pelo parser):  
+  - `IGUAL a b c` → coloca **1 em `c` se `a == b`**, senão **0**.  
+  - `MENOR a b c` → copia o **mínimo entre `a` e `b` para `c`**.  
+  - `MAIOR a b c d` → copia o **máximo entre `a` e `b` para `d`** usando `c` como auxiliar.
+- **Trace executável**: lista das instruções executadas, rótulos visitados, valores antes/depois.  
+- **Exportação de traço** (CLI) para a pasta `runs/` com timestamp.  
+- Interface **GUI** com Tkinter para edição/execução visual.
 
-✅ Interface gráfica moderna com:  
-- Seleção de programas da pasta `programs/`  
-- Entrada dinâmica de registradores com scroll  
-- Botões arredondados e cores destacadas  
-- Saída formatada para fácil leitura  
+> As macros estão em `src/macros.py`; o parser expande chamadas do tipo `faça MACRO (...) vá_para N`.
 
 ---
 
@@ -73,34 +75,74 @@ python main.py
 
 ---
 
-## 🧪 Exemplos de Programas
+## 🧾 Sintaxe dos programas (Norma)
 
-Exemplo de arquivo em `programs/exemplo.txt`:
+Cada linha tem um **rótulo numérico** seguido de uma instrução:
 
-```txt
+```text
 1: se zero_b então vá_para 9 senão vá_para 2
 2: faça add_a vá_para 3
-3: faça sub_b vá_para 1
+3: faça add_a vá_para 4
+4: faça sub_b vá_para 1
 9: fim
 ```
 
+Chamadas de **macro**:
+
+```text
+1: faça IGUAL a b c vá_para 100
+100: fim
+
+1: faça MENOR a b c vá_para 100
+100: fim
+
+1: faça MAIOR a b c d vá_para 100
+100: fim
+```
+
+> **Dicas**
+> - Use apenas letras `a..z` para nome de registradores.  
+> - `sub_x` não deixa o registrador negativo (satura em 0).  
+> - O programa sempre inicia no **menor rótulo** definido.
+
 ---
 
-## 🛠 Tecnologias Utilizadas
+## 🧩 Estendendo com novas macros
 
-- **Python 3.11+**
-- **Tkinter** para GUI
-- **PIL/Pillow** (opcional, para exibir logotipo)
-- Paradigma de programação modular
+1. Abra `src/macros.py` e adicione uma função `macro_<nome>(...)` que **retorne a sequência de instruções expandidas**.  
+2. Registre no dicionário `MACROS = { "NOME": macro_nome, ... }`.  
+3. No programa `.txt`, chame: `faça NOME (args) vá_para RÓTULO`.
+
+O **parser** (`src/parser.py`) cuida da expansão antes da execução.
 
 ---
 
-## 👨‍💻 Autores
+## 🧪 Exemplos incluídos
+
+- `programs/igualdade.txt` → usa `IGUAL a b c` para colocar 1 em `c` se `a == b`.  
+- `programs/maior.txt` → usa `MAIOR a b c d` para escrever o máximo em `d`.  
+- `programs/menor.txt` → usa `MENOR a b c` para escrever o mínimo em `c`.  
+- `programs/exemplo_basico.txt` → programa simples com `add/sub` e teste de zero.
+
+---
+
+## ⚠️ Limitações e validações
+
+- **Inteiros não-negativos** apenas; decremento satura em 0.  
+- **Passos máximos** padrão: `100000` (evita laços infinitos).  
+- Nomes de registradores são **normalizados para minúsculo**.  
+- Erros comuns são tratados com mensagens amigáveis (ex.: divisão por zero — caso implementada por macros futuras).
+
+---
+
+## 👥 Autores
 
 - **Luis Fernando Souza Pinto**  
-- **Kaue Muller**
-- **Bernardo Bencke**
+- **Kaue Muller**  
+- **Bernardo Bencke**  
 - **Leonardo Bencke**
+
+---
 
 ---
 
