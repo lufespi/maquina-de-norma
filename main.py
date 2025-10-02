@@ -1,18 +1,21 @@
-from ui.cli import start_cli
-from ui.gui import start_gui
+import sys
 
 def main():
-    print("=== Simulador Máquina Norma ===")
-    print("1 - Modo CLI (console)")
-    print("2 - Modo GUI (janela)")
-    modo = input("Escolha o modo: ")
+    mode = None
+    if len(sys.argv) >= 2:
+        mode = sys.argv[1].strip().lower()
+    else:
+        print("Uso: python main.py [cli|gui]")
+        mode = input("Escolha o modo (cli/gui): ").strip().lower()
 
-    if modo == "1":
+    if mode == "cli":
+        from ui.cli import start_cli
         start_cli()
-    elif modo == "2":
+    elif mode == "gui":
+        from ui.gui import start_gui
         start_gui()
     else:
-        print("Opção inválida!")
+        print("Modo inválido. Use 'cli' ou 'gui'.")
 
 if __name__ == "__main__":
     main()
