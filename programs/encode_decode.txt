@@ -1,4 +1,0 @@
-# Codifica e decodifica dois números usando Cantor Pair
-1: faça ENCODE(a,b,enc) vá_para 2
-2: faça DECODE(enc,x,y) vá_para 3
-3: # fim

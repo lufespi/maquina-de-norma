@@ -1,0 +1,2 @@
+1: faça MENOR a b c vá_para 100
+100: fim

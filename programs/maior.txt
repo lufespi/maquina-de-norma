@@ -1,0 +1,2 @@
+1: faça MAIOR a b c d vá_para 100
+100: fim

@@ -1,3 +1,0 @@
-# Compara se a e b são iguais. Resultado em eq (1 ou 0)
-1: faça EQUAL(a,b,eq) vá_para 2
-2: # fim

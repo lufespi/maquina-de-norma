@@ -1,3 +1,0 @@
-# Multiplica a * b e armazena resultado em res
-1: faça MULT(a,b,res) vá_para 2
-2: # fim

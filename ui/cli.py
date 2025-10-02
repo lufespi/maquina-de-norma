@@ -1,6 +1,14 @@
 import os
 from core.executor import run_program
 from core.trace_formatter import format_trace
+import time, pathlib
+def salvar_traco(program_path, trace_text):
+    base = pathlib.Path(program_path).stem
+    ts = time.strftime('%Y%m%d-%H%M%S')
+    out = pathlib.Path(__file__).resolve().parents[1] / 'runs' / f'{base}_{ts}.txt'
+    out.write_text(trace_text, encoding='utf-8')
+    print(f'\n[OK] Traço salvo em: {out}')
+
 
 def start_cli():
     while True:

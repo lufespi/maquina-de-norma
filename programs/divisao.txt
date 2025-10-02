@@ -1,3 +1,0 @@
-# Divide a por b e guarda resultado em q (quociente) e r (resto)
-1: faça DIV(a,b,q,r) vá_para 2
-2: # fim

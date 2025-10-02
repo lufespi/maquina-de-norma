@@ -1,86 +1,91 @@
-import re
-from src.macros import MACRO_IMPL  # importa o dicionário de macros
+
+from typing import Dict, List
 
 class NormaVM:
-    def __init__(self, program, registers):
-        """
-        Inicializa a Máquina Norma.
-        :param program: dicionário {rotulo: instrução}
-        :param registers: dicionário {nome: valor_inicial}
-        """
-        self.program = program
-        self.registers = registers
-        self.current_label = min(program.keys())
-        self.trace = []  # guarda o histórico de execução (rótulo, estado dos registradores)
+    def __init__(self, registers: Dict[str, int], max_steps: int = 100000):
+        # normaliza nomes e garante inteiros >= 0
+        self.registers = {str(k).lower(): int(v) if int(v) >= 0 else 0 for k, v in registers.items()}
+        self.max_steps = max_steps
 
-    def run(self):
-        """Executa o programa até terminar."""
-        while self.current_label in self.program:
-            instr = self.program[self.current_label]
-            self.execute(instr)
+    def _get(self, r: str) -> int:
+        return int(self.registers.get(r, 0))
 
-    def execute(self, instr):
-        """Executa uma única instrução."""
-        # Salva o estado antes de executar
-        self.trace.append((self.current_label, self.registers.copy()))
-        s = instr.strip()
+    def _set(self, r: str, v: int):
+        self.registers[r] = max(0, int(v))
 
-        # 1) Teste condicional: se zero_X então vá_para ...
-        if s.startswith("se zero_"):
-            parts = s.split("vá_para")
-            reg = s.split("_", 1)[1].split()[0]
-            true_jump = int(parts[1].split()[0])
-            false_jump = int(parts[2].split()[0])
-            self.current_label = true_jump if self.registers.get(reg, 0) == 0 else false_jump
-            return
+    def run(self, program: Dict[int, dict]) -> List[dict]:
+        if not program:
+            raise ValueError("Programa vazio.")
 
-        # 2) Operações add/sub com salto explícito
-        m = re.match(r"faça\s+(add|sub)_(\w+)\s+vá_para\s+(\d+)", s)
-        if m:
-            op, reg, jmp = m.groups()
-            if op == "add":
-                self.registers[reg] = self.registers.get(reg, 0) + 1
+        # Determina rótulo inicial: o menor rótulo numérico do programa
+        label = min(program.keys())
+
+        # Loop detection opcional (estado = (label, tuple(sorted(registers.items())))
+        seen = set()
+
+        trace: List[dict] = []
+        steps = 0
+
+        while True:
+            steps += 1
+            if steps > self.max_steps:
+                raise RuntimeError(f"Limite de passos excedido ({self.max_steps}). Possível laço infinito.")
+
+            if label not in program:
+                raise ValueError(f"Rótulo {label} não existe no programa.")
+
+            instr = program[label]
+            before = self.registers.copy()
+
+            itype = instr["type"]
+            next_label = None
+            text = instr.get("text", "")
+
+            if itype == "test_zero":
+                r = instr["reg"]
+                if self._get(r) == 0:
+                    next_label = instr["goto_true"]
+                else:
+                    next_label = instr["goto_false"]
+
+            elif itype == "add":
+                r = instr["reg"]
+                self._set(r, self._get(r) + 1)
+                next_label = instr["goto"]
+
+            elif itype == "sub":
+                r = instr["reg"]
+                self._set(r, max(0, self._get(r) - 1))
+                next_label = instr["goto"]
+
+            elif itype == "goto":
+                next_label = instr["goto"]
+
+            elif itype == "halt":
+                # Registro do último estado e término
+                trace.append({
+                    "step": steps, "label": label, "instr_text": text or "fim",
+                    "registers_before": before, "registers_after": self.registers.copy(),
+                    "next_label": "HALT"
+                })
+                break
+
             else:
-                self.registers[reg] = max(0, self.registers.get(reg, 0) - 1)
-            self.current_label = int(jmp)
-            return
+                raise ValueError(f"Instrução desconhecida: {itype}")
 
-        # 3) Chamadas de macro registradas no MACRO_IMPL
-        m = re.match(r"faça\s+([A-Za-z_]\w*)\(([^)]*)\)(?:\s+vá_para\s+(\d+))?", s)
-        if m:
-            nome_macro, args_str, jmp = m.groups()
-            nome_macro = nome_macro.upper()  # normaliza para maiúsculo
-            if nome_macro not in MACRO_IMPL:
-                raise ValueError(
-                    f"Macro '{nome_macro}' não encontrada. "
-                    f"Macros disponíveis: {', '.join(MACRO_IMPL.keys())}"
-                )
+            trace.append({
+                "step": steps, "label": label, "instr_text": text,
+                "registers_before": before, "registers_after": self.registers.copy(),
+                "next_label": next_label
+            })
 
-            func, arity = MACRO_IMPL[nome_macro]
-            args = [a.strip() for a in args_str.split(",")] if args_str else []
-            if len(args) != arity:
-                raise ValueError(
-                    f"Macro '{nome_macro}' espera {arity} argumentos, recebeu {len(args)} ({args})"
-                )
+            # detecção simples de ciclo
+            state_key = (next_label, tuple(sorted(self.registers.items())))
+            if state_key in seen:
+                # evita loop infinito sem explodir
+                raise RuntimeError("Ciclo detectado na execução (estado repetido).")
+            seen.add(state_key)
 
-            # Executa a macro passando os registradores
-            func(self.registers, *args)
-            # Se houver vá_para, usa o rótulo. Senão, vai para o próximo.
-            self.current_label = int(jmp) if jmp else self.current_label + 1
-            return
+            label = next_label
 
-        # 4) Comentário ou fim de programa
-        if s.startswith("#"):
-            self.current_label = None
-            return
-
-        # 5) Caso nenhuma regra reconheça
-        raise ValueError(f"Instrução desconhecida: {instr}")
-
-    def print_trace(self):
-        """Imprime o trace de execução."""
-        print("\n=== TRACE DE EXECUÇÃO ===")
-        for label, regs in self.trace:
-            estado = ", ".join(f"{k}={v}" for k, v in regs.items())
-            print(f"Rótulo {label} -> {estado}")
-        print("=== FIM ===")
+        return trace
