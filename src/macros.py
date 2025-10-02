@@ -50,7 +50,7 @@ def layout_to_instruction_list(layout_dict):
 # ---------- MENOR(a,b,c): menor valor em c ----------
 def macro_min(a, b, c):
     layout = {
-        0: test_zero(c, 3, 1),
+        0: test_zero(c, 2, 1),
         1: sub(c, 0),
         2: test_zero(a, 7, 3),
         3: test_zero(b, 7, 4),
@@ -59,7 +59,7 @@ def macro_min(a, b, c):
         6: add(c, 2),
         7: halt(),
     }
-    layout[0]["text"] = f"se zero_{c} então vá_para 3 senão vá_para 1"
+    layout[0]["text"] = f"se zero_{c} então vá_para 2 senão vá_para 1"
     layout[1]["text"] = f"faça sub_{c} vá_para 0"
     layout[2]["text"] = f"se zero_{a} então vá_para 7 senão vá_para 3"
     layout[3]["text"] = f"se zero_{b} então vá_para 7 senão vá_para 4"
@@ -73,7 +73,7 @@ def macro_min(a, b, c):
 # ---------- MAIOR(a,b,c,d): maior valor em d (usa c como auxiliar) ----------
 def macro_max(a, b, c, d):
     layout = {
-        0: test_zero(c, 3, 1),
+        0: test_zero(c, 2, 1),
         1: sub(c, 0),
         2: test_zero(d, 4, 3),
         3: sub(d, 2),
@@ -93,7 +93,7 @@ def macro_max(a, b, c, d):
         17: add(d, 15),
         18: halt(),
     }
-    layout[0]["text"] = f"se zero_{c} então vá_para 3 senão vá_para 1"
+    layout[0]["text"] = f"se zero_{c} então vá_para 2 senão vá_para 1"
     layout[1]["text"] = f"faça sub_{c} vá_para 0"
     layout[2]["text"] = f"se zero_{d} então vá_para 4 senão vá_para 3"
     layout[3]["text"] = f"faça sub_{d} vá_para 2"
